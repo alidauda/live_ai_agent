@@ -1,0 +1,22 @@
+[project]
+name = "solana_agent_agentipy"
+version = "0.1.0"
+description = "solana_agent_agentipy using crewAI"
+authors = [{ name = "Your Name", email = "you@example.com" }]
+requires-python = ">=3.10,<3.13"
+dependencies = ["agentipy>=2.1.1.post6", "crewai[tools]>=0.114.0,<1.0.0"]
+
+[project.scripts]
+solana_agent_agentipy = "solana_agent_agentipy.main:run"
+run_crew = "solana_agent_agentipy.main:run"
+train = "solana_agent_agentipy.main:train"
+replay = "solana_agent_agentipy.main:replay"
+test = "solana_agent_agentipy.main:test"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.crewai]
+type = "crew"
+entry_point = "solana_agent_agentipy.main:run"
