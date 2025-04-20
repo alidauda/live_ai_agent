@@ -1,12 +1,7 @@
 wallet_intel:
   description: >
-    Analyze the user input and take appropriate action using available tools.
-    Handle balance checks, valuation, and conditional transfers based on wallet value.
-
-    Example user inputs:
-    - "What's my portfolio worth?"
-    - "If my wallet is worth more than $1000, send 1 SOL to this address"
-    - "Check my SOL balance"
+    Analyze the following instruction and take appropriate action using tools: {user_input}
+    Handle balance checks, valuation, and conditional transfers.
 
   expected_output: >
     Respond with SOL balance, current valuation, or transfer confirmation.
