@@ -5,7 +5,12 @@ from solana_agent_agentipy.tools.custom_tool import make_balance_tool
 from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
 import os
-import yaml
+from crewai.process import Process
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -13,45 +18,83 @@ load_dotenv()
 class SolanaWalletCrew:
     """SolanaAgentAgentipy crew"""
 
-    # Define static paths
-    agents_config_path = os.path.join(os.path.dirname(__file__), 'config/agents.yaml')
-    tasks_config_path = os.path.join(os.path.dirname(__file__), 'config/tasks.yaml')
-
     def __init__(self):
-        self.kit = SolanaAgentKit(
-            private_key=os.getenv("SOLANA_PRIVATE_KEY"),
-            rpc_url="https://api.devnet.solana.com"
-        )
+        logger.info("🔧 Initializing SolanaWalletCrew")
+        try:
+            self.kit = SolanaAgentKit(
+                private_key=os.getenv("SOLANA_PRIVATE_KEY"),
+                rpc_url="https://api.devnet.solana.com"
+            )
+            logger.info("✅ SolanaAgentKit initialized")
+            self._operator = None
+            self._balance_tool = None
+        except Exception as e:
+            logger.error(f"Failed to initialize SolanaWalletCrew: {str(e)}")
+            raise
 
-    def _load_yaml(self, path):
-        with open(path, 'r') as f:
-            return yaml.safe_load(f)
+    def _get_balance_tool(self):
+        if self._balance_tool is None:
+            logger.info("🔧 Creating balance tool")
+            self._balance_tool = make_balance_tool(agent=self.kit)
+            logger.info("✅ Balance tool created")
+        return self._balance_tool
 
     @agent
     def solana_operator(self) -> Agent:
-        config = self._load_yaml(self.agents_config_path)['solana_operator']
-        print("✅ Loaded agent config:", type(config))
-        return Agent(
-            config=config,
-            tools=[
-                make_balance_tool(agent=self.kit),
-            ],
-            llm=ChatOpenAI(model=os.getenv("MODEL"), temperature=0),
-            verbose=True
-        )
+        if self._operator is None:
+            logger.info("🔧 Creating solana_operator agent")
+            try:
+                balance_tool = self._get_balance_tool()
+                
+                self._operator = Agent(
+                    role="Solana Wallet Agent",
+                    goal="Help the user with natural language wallet actions using planning and real-time tools.",
+                    backstory="You are a powerful AI wallet assistant that can fetch balances, prices, and conditionally send tokens.",
+                    tools=[balance_tool],
+                    llm=ChatOpenAI(model=os.getenv("MODEL"), temperature=0),
+                    verbose=True,
+                    allow_delegation=False
+                )
+                logger.info("✅ solana_operator agent created")
+            except Exception as e:
+                logger.error(f"Failed to create solana_operator agent: {str(e)}")
+                raise
+        return self._operator
 
+    
     @task
-    def wallet_intel(self) -> Task:
-        config = self._load_yaml(self.tasks_config_path)['wallet_intel']
-        print("✅ Loaded task config:", type(config))
-        return Task(
-            config=config,
-            agent=self.solana_operator
-        )
+    def wallet_intel(self):
+        return {
+        "description": """
+            Analyze the following instruction and take appropriate action using tools: {user_input}
+            Handle balance checks, valuation, and conditional transfers.
+        """,
+        "expected_output": """
+            Respond with SOL balance, current valuation, or transfer confirmation.
+        """,
+        "agent": self.solana_operator()
+    }
+
 
     @crew
     def crew(self) -> Crew:
-        return Crew(
-            agents=[self.solana_operator],
-            tasks=[self.wallet_intel]
-        )
+        logger.info("🔧 Creating crew")
+        try:
+            operator = self.solana_operator()
+            logger.info("✅ Got operator agent for crew")
+            
+            task = self.wallet_intel()
+            logger.info("✅ Got wallet_intel task")
+            
+            crew = Crew(
+                agents=[operator],
+                tasks=[task],
+                process=Process.sequential,
+                verbose=True,
+                memory=False
+            )
+            logger.info("✅ Crew created")
+            return crew
+        except Exception as e:
+            logger.error(f"Failed to create crew: {str(e)}")
+            raise
