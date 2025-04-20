@@ -1,4 +1,4 @@
-wallet_intel:
+solana_operation:
   description: >
     Analyze the following instruction and take appropriate action using tools: {user_input}
     Handle balance checks, valuation, and conditional transfers.
